@@ -59,6 +59,16 @@ export class MalKeyword extends MalType {
     }
 }
 
+export class MalFunction extends MalType {
+    constructor() {
+        super();
+        this.ast = null;
+        this.params = null;
+        this.env = null;
+        this.fn = null;
+    }
+}
+
 export class MalTypesFactory {
     makeNumber(v) {
         const malNumber = new MalNumber();
@@ -118,6 +128,10 @@ export class MalTypesFactory {
 
 export function isMalList(x) {
     return x instanceof MalList || x instanceof MalVector;
+}
+
+export function isFalsy(x) {
+    return x instanceof MalFalse || x instanceof MalNil;
 }
 
 /**
