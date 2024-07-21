@@ -1,4 +1,13 @@
-import { MalHash, MalList, MalNumber, MalString, MalSymbol, MalType, MalVector } from './types.js';
+import {
+    MalHash,
+    MalKeyword,
+    MalList,
+    MalNumber,
+    MalString,
+    MalSymbol,
+    MalType,
+    MalVector,
+} from './types.js';
 
 /**
  * @param {MalType} v
@@ -30,6 +39,8 @@ export function pr_str(v, print_readably = true) {
         } else {
             return v.value;
         }
+    } else if (v instanceof MalKeyword) {
+        return v.value;
     } else if (v instanceof MalSymbol) {
         return v.value;
     } else {

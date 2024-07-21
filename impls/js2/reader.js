@@ -1,5 +1,13 @@
 import { NextInput } from './errors.js';
-import { MalVector, MalHash, MalList, MalNumber, MalString, MalSymbol } from './types.js';
+import {
+    MalVector,
+    MalHash,
+    MalList,
+    MalNumber,
+    MalString,
+    MalSymbol,
+    MalKeyword,
+} from './types.js';
 
 class Reader {
     END_VALUE = undefined;
@@ -128,7 +136,7 @@ function read_list(reader, endToken, listInstance) {
  */
 function read_atom(reader) {
     const token = reader.next();
-    if (token.match(/^\d+$/)) {
+    if (token.match(/^[+-]?\d+$/)) {
         const malNumber = new MalNumber();
         malNumber.value = parseInt(token);
         return malNumber;
@@ -156,7 +164,9 @@ function read_atom(reader) {
     } else if (token[0] === ';') {
         // pass
     } else if (token[0] === ':') {
-        return token;
+        const malKeyword = new MalKeyword();
+        malKeyword.value = token;
+        return malKeyword;
     } else {
         const malSymbol = new MalSymbol();
         malSymbol.value = token;
