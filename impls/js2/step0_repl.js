@@ -25,4 +25,4 @@ async function rep() {
     PRINT(result);
 }
 
-while(true) await rep();
+while (true) await rep();
