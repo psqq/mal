@@ -7,6 +7,7 @@ import {
     MalString,
     MalSymbol,
     MalKeyword,
+    MalTypesFactory,
 } from './types.js';
 
 class Reader {
@@ -167,6 +168,12 @@ function read_atom(reader) {
         const malKeyword = new MalKeyword();
         malKeyword.value = token;
         return malKeyword;
+    } else if (token === 'nil') {
+        return new MalTypesFactory().makeNil();
+    } else if (token === 'true') {
+        return new MalTypesFactory().makeTrue();
+    } else if (token === 'false') {
+        return new MalTypesFactory().makeFalse();
     } else {
         const malSymbol = new MalSymbol();
         malSymbol.value = token;

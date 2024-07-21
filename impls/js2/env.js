@@ -1,3 +1,5 @@
+import { MalList, MalTypesFactory, MalVector, isMalList } from './types.js';
+
 export class Env {
     constructor() {
         /** @type {Env} */
@@ -33,9 +35,26 @@ export class Env {
 }
 
 export class EnvFactory {
-    makeEnv(outer = null) {
+    /**
+     * @param {Env} outer
+     * @param {MalList} binds
+     * @param {MalType[]} exprs
+     * @returns
+     */
+    makeEnv(outer = null, binds = null, exprs = []) {
         const env = new Env();
         env.outer = outer;
+        if (isMalList(binds)) {
+            for (const [i, b] of binds.value.entries()) {
+                if (b.value === '&') {
+                    const restExprs = new MalTypesFactory().makeList(exprs.slice(i));
+                    env.set(binds.value[i + 1].value, restExprs);
+                    break;
+                } else {
+                    env.set(b.value, exprs[i]);
+                }
+            }
+        }
         return env;
     }
 }
