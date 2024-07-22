@@ -15,6 +15,7 @@ import {
     isFalsy,
     isMalList,
 } from './types.js';
+import { isFunction } from './utils.js';
 
 const repl_env = new EnvFactory().makeEnv();
 for (const [k, v] of Object.entries(core.ns)) {
@@ -64,6 +65,53 @@ function eval_ast(ast, env) {
     }
 }
 
+function quasiquote(ast) {
+    if (
+        ast instanceof MalList &&
+        ast.value[0] instanceof MalSymbol &&
+        ast.value[0].value === 'unquote'
+    ) {
+        return ast.value[1];
+    } else if (isMalList(ast)) {
+        let result = new MalTypesFactory().makeList();
+        for (let i = ast.value.length - 1; i >= 0; i--) {
+            const elt = ast.value[i];
+            if (
+                elt instanceof MalList &&
+                elt.value[0] instanceof MalSymbol &&
+                elt.value[0].value === 'splice-unquote'
+            ) {
+                let newResult = new MalTypesFactory().makeList();
+                newResult.value = [
+                    new MalTypesFactory().makeSymbol('concat'),
+                    elt.value[1],
+                    result,
+                ];
+                result = newResult;
+            } else {
+                let newResult = new MalTypesFactory().makeList();
+                newResult.value = [
+                    new MalTypesFactory().makeSymbol('cons'),
+                    quasiquote(elt),
+                    result,
+                ];
+                result = newResult;
+            }
+        }
+        if (ast instanceof MalVector) {
+            return new MalTypesFactory().makeList([
+                new MalTypesFactory().makeSymbol('vec'),
+                result,
+            ]);
+        }
+        return result;
+    } else if (ast instanceof MalHash || ast instanceof MalSymbol) {
+        return new MalTypesFactory().makeList([new MalTypesFactory().makeSymbol('quote'), ast]);
+    } else {
+        return ast;
+    }
+}
+
 function EVAL(astArg, envArg) {
     let ast = astArg;
     let env = envArg;
@@ -90,6 +138,12 @@ function EVAL(astArg, envArg) {
                 env.set(key, value);
             }
             ast = ast.value[2];
+        } else if (ast.value[0].value === 'quote') {
+            return ast.value[1];
+        } else if (ast.value[0].value === 'quasiquote') {
+            ast = quasiquote(ast.value[1]);
+        } else if (ast.value[0].value === 'quasiquoteexpand') {
+            return quasiquote(ast.value[1]);
         } else if (ast.value[0].value === 'do') {
             const rest = new MalTypesFactory().makeListSlice(ast, 1, -1);
             const result = eval_ast(rest, env);
@@ -124,6 +178,9 @@ function EVAL(astArg, envArg) {
                 ast = func.ast;
                 env = new EnvFactory().makeEnv(func.env, func.params, args);
             } else {
+                if (!isFunction(func)) {
+                    throw new Error(`func ${JSON.stringify(func)} is not a function`);
+                }
                 return func(...args);
             }
         }
@@ -134,7 +191,7 @@ function PRINT(s) {
     console.log(pr_str(s));
 }
 
-async function rep(readFunc = () => READ()) {
+async function rep(readFunc = () => READ(), { withPrint = true } = {}) {
     try {
         const ast = await readFunc();
         EVAL(read_str('(def! not (fn* (a) (if a false true)))'), repl_env);
@@ -145,7 +202,9 @@ async function rep(readFunc = () => READ()) {
             repl_env,
         );
         const result = EVAL(ast, repl_env);
-        PRINT(result);
+        if (withPrint) {
+            PRINT(result);
+        }
     } catch (e) {
         if (e instanceof NextInput) {
             return;
@@ -167,7 +226,7 @@ if (process.argv.length > 2) {
             process.argv.slice(3).map((s) => new MalTypesFactory().makeStringByValue(s)),
         ),
     );
-    await rep(() => read_str(`(load-file "${filename}")`));
+    await rep(() => read_str(`(load-file "${filename}")`), { withPrint: false });
     process.exit(0);
 }
 

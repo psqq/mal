@@ -113,7 +113,7 @@ export class MalTypesFactory {
         return malString;
     }
 
-    makeList(v) {
+    makeList(v = []) {
         const malList = new MalList();
         malList.value = v;
         return malList;

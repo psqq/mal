@@ -130,4 +130,21 @@ export const ns = {
         }
         return new MalTypesFactory().makeStringByValue(pr_str(func));
     },
+    ['cons']: (malValue, malList) => {
+        const newList = [malValue];
+        return new MalTypesFactory().makeList(newList.concat(malList.value));
+    },
+    ['concat']: (...args) => {
+        let newList = [];
+        for (const arg of args) {
+            newList = newList.concat(arg.value);
+        }
+        return new MalTypesFactory().makeList(newList);
+    },
+    ['vec']: (malValue) => {
+        if (malValue instanceof MalVector) {
+            return malValue;
+        }
+        return new MalTypesFactory().makeVector(malValue.value);
+    },
 };

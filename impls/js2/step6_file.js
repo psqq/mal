@@ -134,7 +134,7 @@ function PRINT(s) {
     console.log(pr_str(s));
 }
 
-async function rep(readFunc = () => READ()) {
+async function rep(readFunc = () => READ(), { withPrint = true } = {}) {
     try {
         const ast = await readFunc();
         EVAL(read_str('(def! not (fn* (a) (if a false true)))'), repl_env);
@@ -145,7 +145,9 @@ async function rep(readFunc = () => READ()) {
             repl_env,
         );
         const result = EVAL(ast, repl_env);
-        PRINT(result);
+        if (withPrint) {
+            PRINT(result);
+        }
     } catch (e) {
         if (e instanceof NextInput) {
             return;
@@ -167,7 +169,7 @@ if (process.argv.length > 2) {
             process.argv.slice(3).map((s) => new MalTypesFactory().makeStringByValue(s)),
         ),
     );
-    await rep(() => read_str(`(load-file "${filename}")`));
+    await rep(() => read_str(`(load-file "${filename}")`), { withPrint: false });
     process.exit(0);
 }
 
