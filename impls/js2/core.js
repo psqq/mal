@@ -1,5 +1,16 @@
 import { pr_str } from './printer.js';
-import { MalList, MalNumber, MalTypesFactory, MalVector, cmpMalValues } from './types.js';
+import { read_str } from './reader.js';
+import {
+    MalAtom,
+    MalFunction,
+    MalList,
+    MalNumber,
+    MalTypesFactory,
+    MalVector,
+    cmpMalValues,
+    isMalList,
+} from './types.js';
+import fs from 'node:fs';
 
 function cmpNumbers(op) {
     const cmpFunc = {
@@ -28,8 +39,8 @@ export const ns = {
     list: (...args) => {
         return new MalTypesFactory().makeList(args);
     },
-    ['list?']: (...args) => {
-        if (args[0] instanceof MalList) {
+    ['list?']: (malValue) => {
+        if (malValue instanceof MalList) {
             return new MalTypesFactory().makeTrue();
         } else {
             return new MalTypesFactory().makeFalse();
@@ -45,14 +56,14 @@ export const ns = {
             return new MalTypesFactory().makeFalse();
         }
     },
-    ['count']: (...args) => {
-        if (args[0] instanceof MalList || args[0] instanceof MalVector) {
-            return new MalTypesFactory().makeNumber(args[0].value.length);
+    ['count']: (malValue) => {
+        if (isMalList(malValue)) {
+            return new MalTypesFactory().makeNumber(malValue.value.length);
         }
         return new MalTypesFactory().makeNumber(0);
     },
-    ['=']: (...args) => {
-        if (cmpMalValues(args[0], args[1])) {
+    ['=']: (a, b) => {
+        if (cmpMalValues(a, b)) {
             return new MalTypesFactory().makeTrue();
         }
         return new MalTypesFactory().makeFalse();
@@ -78,5 +89,45 @@ export const ns = {
         const s = args.map((arg) => pr_str(arg, false)).join(' ');
         console.log(s);
         return new MalTypesFactory().makeNil();
+    },
+    ['read-string']: (malString) => {
+        const result = read_str(malString.value);
+        return result;
+    },
+    ['slurp']: (malString) => {
+        const filename = malString.value;
+        const content = fs.readFileSync(filename, { encoding: 'utf-8' });
+        return new MalTypesFactory().makeStringByValue(content);
+    },
+    ['atom']: (malValue) => {
+        return new MalTypesFactory().makeAtom(malValue);
+    },
+    ['atom?']: (malValue) => {
+        if (malValue instanceof MalAtom) {
+            return new MalTypesFactory().makeTrue();
+        } else {
+            return new MalTypesFactory().makeFalse();
+        }
+    },
+    ['deref']: (malAtom) => {
+        return malAtom.value;
+    },
+    ['reset!']: (malAtom, malValue) => {
+        malAtom.value = malValue;
+        return malAtom.value;
+    },
+    ['swap!']: (malAtom, malFunction, ...args) => {
+        if (malFunction instanceof MalFunction) {
+            malAtom.value = malFunction.fn(malAtom.value, ...args);
+        } else {
+            malAtom.value = malFunction(malAtom.value, ...args);
+        }
+        return malAtom.value;
+    },
+    ['func-ast']: (func) => {
+        if (func instanceof MalFunction) {
+            return new MalTypesFactory().makeStringByValue(pr_str(func.ast));
+        }
+        return new MalTypesFactory().makeStringByValue(pr_str(func));
     },
 };

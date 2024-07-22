@@ -1,5 +1,7 @@
 import {
+    MalAtom,
     MalFalse,
+    MalFunction,
     MalHash,
     MalKeyword,
     MalList,
@@ -53,9 +55,11 @@ export function pr_str(v, print_readably = true) {
         return v.value;
     } else if (v instanceof MalSymbol) {
         return v.value;
-    } else if (isFunction(v)) {
+    } else if (v instanceof MalAtom) {
+        return '(atom ' + pr_str(v.value, print_readably) + ')';
+    } else if (isFunction(v) || v instanceof MalFunction) {
         return '#<function>';
     } else {
-        return String(v);
+        return '(JS_STRING ' + String(v) + ')';
     }
 }

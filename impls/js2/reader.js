@@ -8,6 +8,7 @@ import {
     MalSymbol,
     MalKeyword,
     MalTypesFactory,
+    MalType,
 } from './types.js';
 
 class Reader {
@@ -90,12 +91,13 @@ function tokenize(s) {
             }
             case 'string': {
                 if (s[i] === '\\') {
-                    if (i + 1 < s.length) {
-                        t += '\\' + s[i + 1];
-                        inc = 2;
-                    } else {
+                    if (i + 1 >= s.length) {
                         throw new Error('Expected escaped char but found EOF');
                     }
+                    t += '\\' + s[i + 1];
+                    inc = 2;
+                } else if (s[i] === '\n') {
+                    t += '\\n';
                 } else if (s[i] === '"') {
                     tokens.push(t + '"');
                     q = '';
@@ -127,7 +129,10 @@ function read_list(reader, endToken, listInstance) {
         if (token === Reader.END_VALUE) {
             break;
         }
-        listInstance.value.push(read_form(reader));
+        const form = read_form(reader);
+        if (form instanceof MalType) {
+            listInstance.value.push(form);
+        }
     }
     throw new Error(`Expected end token "${endToken}" but found EOF`);
 }
@@ -195,37 +200,37 @@ function read_form(reader) {
     } else if (token === "'") {
         reader.next();
         const malList = new MalList();
-        malList.value.push('quote');
+        malList.value.push(new MalTypesFactory().makeSymbol('quote'));
         malList.value.push(read_form(reader));
         return malList;
     } else if (token === '`') {
         reader.next();
         const malList = new MalList();
-        malList.value.push('quasiquote');
+        malList.value.push(new MalTypesFactory().makeSymbol('quasiquote'));
         malList.value.push(read_form(reader));
         return malList;
     } else if (token === '~') {
         reader.next();
         const malList = new MalList();
-        malList.value.push('unquote');
+        malList.value.push(new MalTypesFactory().makeSymbol('unquote'));
         malList.value.push(read_form(reader));
         return malList;
     } else if (token === '~@') {
         reader.next();
         const malList = new MalList();
-        malList.value.push('splice-unquote');
+        malList.value.push(new MalTypesFactory().makeSymbol('splice-unquote'));
         malList.value.push(read_form(reader));
         return malList;
     } else if (token === '@') {
         reader.next();
         const malList = new MalList();
-        malList.value.push('deref');
+        malList.value.push(new MalTypesFactory().makeSymbol('deref'));
         malList.value.push(read_form(reader));
         return malList;
     } else if (token === '^') {
         reader.next();
         const malList = new MalList();
-        malList.value.push('with-meta');
+        malList.value.push(new MalTypesFactory().makeSymbol('with-meta'));
         const a = read_form(reader);
         const b = read_form(reader);
         malList.value.push(b);

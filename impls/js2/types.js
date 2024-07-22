@@ -62,10 +62,22 @@ export class MalKeyword extends MalType {
 export class MalFunction extends MalType {
     constructor() {
         super();
+        /** @type {MalType} */
         this.ast = null;
+        /** @type {MalType[]} */
         this.params = null;
+        /** @type {import('./env.js').Env} */
         this.env = null;
+        /** @type {function} */
         this.fn = null;
+    }
+}
+
+export class MalAtom extends MalType {
+    constructor() {
+        super();
+        /** @type {MalType} */
+        this.value = null;
     }
 }
 
@@ -74,6 +86,12 @@ export class MalTypesFactory {
         const malNumber = new MalNumber();
         malNumber.value = v;
         return malNumber;
+    }
+
+    makeSymbol(s) {
+        const malSymbol = new MalSymbol();
+        malSymbol.value = s;
+        return malSymbol;
     }
 
     makeStringByValue(v) {
@@ -101,6 +119,12 @@ export class MalTypesFactory {
         return malList;
     }
 
+    makeListSlice(malList, start, end) {
+        const malListSlice = new MalList();
+        malListSlice.value = malList.value.slice(start, end);
+        return malListSlice;
+    }
+
     makeVector(v) {
         const malVector = new MalVector();
         malVector.value = v;
@@ -124,8 +148,18 @@ export class MalTypesFactory {
     makeNil() {
         return new MalNil();
     }
+
+    makeAtom(v) {
+        const malHash = new MalAtom();
+        malHash.value = v;
+        return malHash;
+    }
 }
 
+/**
+ * @param {MalType} x
+ * @returns {x is MalList | MalVector}
+ */
 export function isMalList(x) {
     return x instanceof MalList || x instanceof MalVector;
 }
