@@ -41,6 +41,48 @@ async function READ() {
  * @param {Env} env
  * @returns
  */
+function is_macro_call(ast, env) {
+    if (ast instanceof MalList && ast.value[0] instanceof MalSymbol) {
+        const found_env = env.find(ast.value[0].value);
+        if (!found_env) {
+            return false;
+        }
+        const malValue = found_env.get(ast.value[0].value);
+        if (malValue instanceof MalFunction) {
+            return malValue.is_macro;
+        }
+    }
+    return false;
+}
+
+function apply() {}
+
+/**
+ * @param {MalType} ast
+ * @param {Env} env
+ * @returns
+ */
+function macro_expand(ast, env) {
+    while (is_macro_call(ast, env)) {
+        const func = env.get([ast.value[0].value]);
+        const args = ast.value.slice(1);
+        if (func instanceof MalFunction) {
+            ast = func.fn(...args);
+        } else {
+            if (!isFunction(func)) {
+                throw new Error(`macro_expand: func ${JSON.stringify(func)} is not a function`);
+            }
+            ast = func(...args);
+        }
+    }
+    return ast;
+}
+
+/**
+ * @param {MalType} ast
+ * @param {Env} env
+ * @returns
+ */
 function eval_ast(ast, env) {
     if (ast instanceof MalSymbol) {
         return env.get(ast.value);
@@ -119,13 +161,28 @@ function EVAL(astArg, envArg) {
         if (!(ast instanceof MalList)) {
             return eval_ast(ast, env);
         }
+
+        ast = macro_expand(ast, env);
+        if (!(ast instanceof MalList)) {
+            return eval_ast(ast, env);
+        }
         if (!ast.value.length) {
             return ast;
         }
+
         if (ast.value[0].value === 'def!') {
             const v = EVAL(ast.value[2], env);
             env.set(ast.value[1].value, v);
             return v;
+        } else if (ast.value[0].value === 'defmacro!') {
+            const v = EVAL(ast.value[2], env);
+            if (v instanceof MalFunction) {
+                v.is_macro = true;
+            }
+            env.set(ast.value[1].value, v);
+            return v;
+        } else if (ast.value[0].value === 'macroexpand') {
+            return macro_expand(ast.value[1], env);
         } else if (ast.value[0].value === 'let*') {
             env = new EnvFactory().makeEnv(env);
             const letEnvList = ast.value[1];
@@ -198,6 +255,12 @@ async function rep(readFunc = () => READ(), { withPrint = true } = {}) {
         EVAL(
             read_str(
                 '(def! load-file (fn* (f) (eval (read-string (str "(do " (slurp f) "\nnil)")))))',
+            ),
+            repl_env,
+        );
+        EVAL(
+            read_str(
+                '(defmacro! cond (fn* (& xs) (if (> (count xs) 0) (list \'if (first xs) (if (> (count xs) 1) (nth xs 1) (throw "odd number of forms to cond")) (cons \'cond (rest (rest xs)))))))',
             ),
             repl_env,
         );

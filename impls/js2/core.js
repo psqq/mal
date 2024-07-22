@@ -147,4 +147,28 @@ export const ns = {
         }
         return new MalTypesFactory().makeVector(malValue.value);
     },
+    ['nth']: (malValue, malNumber) => {
+        if (isMalList(malValue)) {
+            if (malNumber.value < 0 || malNumber.value >= malValue.value.length) {
+                throw 'out of range';
+            }
+            return malValue.value[malNumber.value];
+        }
+        return new MalTypesFactory().makeVector(malValue.value);
+    },
+    ['first']: (malValue) => {
+        if (isMalList(malValue)) {
+            if (malValue.value.length > 0) {
+                return malValue.value[0];
+            }
+        }
+        return new MalTypesFactory().makeNil();
+    },
+    ['rest']: (malValue) => {
+        const result = new MalTypesFactory().makeList();
+        if (isMalList(malValue)) {
+            result.value = malValue.value.slice(1);
+        }
+        return result;
+    },
 };

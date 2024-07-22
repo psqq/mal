@@ -70,6 +70,7 @@ export class MalFunction extends MalType {
         this.env = null;
         /** @type {function} */
         this.fn = null;
+        this.is_macro = false;
     }
 }
 
