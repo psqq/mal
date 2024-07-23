@@ -1,4 +1,13 @@
+import { isFunction } from './utils.js';
+
 export class MalType {}
+
+export class MalTypeWithMeta extends MalType {
+    constructor() {
+        super();
+        this.meta = new MalTypesFactory().makeNil();
+    }
+}
 
 export class MalNil extends MalType {}
 
@@ -6,7 +15,7 @@ export class MalTrue extends MalType {}
 
 export class MalFalse extends MalType {}
 
-export class MalList extends MalType {
+export class MalList extends MalTypeWithMeta {
     constructor() {
         super();
         /** @type {MalType[]} */
@@ -14,7 +23,7 @@ export class MalList extends MalType {
     }
 }
 
-export class MalVector extends MalType {
+export class MalVector extends MalTypeWithMeta {
     constructor() {
         super();
         /** @type {MalType[]} */
@@ -22,7 +31,7 @@ export class MalVector extends MalType {
     }
 }
 
-export class MalHash extends MalType {
+export class MalHash extends MalTypeWithMeta {
     constructor() {
         super();
         /** @type {MalType[]} */
@@ -59,7 +68,7 @@ export class MalKeyword extends MalType {
     }
 }
 
-export class MalFunction extends MalType {
+export class MalFunction extends MalTypeWithMeta {
     constructor() {
         super();
         /** @type {MalType} */
@@ -182,7 +191,11 @@ export class MalTypesFactory {
 
     makeError(reason) {
         const malError = new MalError();
-        malError.reason = reason;
+        if (reason instanceof MalType) {
+            malError.reason = reason;
+        } else {
+            malError.reason = this.makeStringByValue(reason);
+        }
         return malError;
     }
 }
@@ -259,4 +272,58 @@ export function cmpMalValues(a, b) {
         return true;
     }
     return false;
+}
+
+/**
+ * @param {MalType} malValue
+ */
+export function clone(malValue) {
+    if (malValue instanceof MalFunction) {
+        const newMalValue = new MalFunction();
+        newMalValue.ast = malValue.ast;
+        newMalValue.env = malValue.env;
+        newMalValue.fn = malValue.fn;
+        newMalValue.is_macro = malValue.is_macro;
+        newMalValue.params = malValue.params;
+        newMalValue.meta = malValue.meta;
+        return newMalValue;
+    }
+    if (malValue instanceof MalList) {
+        const newMalValue = new MalList();
+        newMalValue.value = malValue.value;
+        newMalValue.meta = malValue.meta;
+        return newMalValue;
+    }
+    if (malValue instanceof MalVector) {
+        const newMalValue = new MalVector();
+        newMalValue.value = malValue.value;
+        newMalValue.meta = malValue.meta;
+        return newMalValue;
+    }
+    if (malValue instanceof MalHash) {
+        const newMalValue = new MalHash();
+        newMalValue.value = malValue.value;
+        newMalValue.meta = malValue.meta;
+        return newMalValue;
+    }
+    if (malValue instanceof MalHash) {
+        const newMalValue = new MalHash();
+        newMalValue.value = malValue.value;
+        newMalValue.meta = malValue.meta;
+        return newMalValue;
+    }
+    if (
+        malValue instanceof MalNumber ||
+        malValue instanceof MalString ||
+        malValue instanceof MalSymbol ||
+        malValue instanceof MalKeyword
+    ) {
+        const newMalValue = new malValue.constructor();
+        newMalValue.value = malValue.value;
+        return newMalValue;
+    }
+    if (isFunction(malValue)) {
+        return malValue.bind(global);
+    }
+    return malValue;
 }

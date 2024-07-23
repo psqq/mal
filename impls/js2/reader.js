@@ -92,7 +92,9 @@ function tokenize(s) {
             case 'string': {
                 if (s[i] === '\\') {
                     if (i + 1 >= s.length) {
-                        throw new Error('Expected escaped char but found EOF');
+                        throw new MalTypesFactory().makeError(
+                            'Expected escaped char but found EOF',
+                        );
                     }
                     t += '\\' + s[i + 1];
                     inc = 2;
@@ -110,7 +112,7 @@ function tokenize(s) {
         i += inc;
     }
     if (q === 'string') {
-        throw new Error('Expected string but found EOF');
+        throw new MalTypesFactory().makeError('Expected string but found EOF');
     }
     return tokens;
 }
@@ -134,7 +136,7 @@ function read_list(reader, endToken, listInstance) {
             listInstance.value.push(form);
         }
     }
-    throw new Error(`Expected end token "${endToken}" but found EOF`);
+    throw new MalTypesFactory().makeError(`Expected end token "${endToken}" but found EOF`);
 }
 
 /**

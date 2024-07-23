@@ -1,5 +1,6 @@
 import { pr_str } from './printer.js';
 import { read_str } from './reader.js';
+import { readline } from './readline.js';
 import {
     MalAtom,
     MalError,
@@ -10,14 +11,17 @@ import {
     MalList,
     MalNil,
     MalNumber,
+    MalString,
     MalSymbol,
     MalTrue,
     MalTypesFactory,
     MalVector,
+    clone,
     cmpMalValues,
     isMalList,
 } from './types.js';
 import fs from 'node:fs';
+import { isFunction } from './utils.js';
 
 function cmpNumbers(op) {
     const cmpFunc = {
@@ -123,11 +127,11 @@ export const ns = {
         malAtom.value = malValue;
         return malAtom.value;
     },
-    ['swap!']: (malAtom, malFunction, ...args) => {
+    ['swap!']: async (malAtom, malFunction, ...args) => {
         if (malFunction instanceof MalFunction) {
-            malAtom.value = malFunction.fn(malAtom.value, ...args);
+            malAtom.value = await malFunction.fn(malAtom.value, ...args);
         } else {
-            malAtom.value = malFunction(malAtom.value, ...args);
+            malAtom.value = await malFunction(malAtom.value, ...args);
         }
         return malAtom.value;
     },
@@ -181,7 +185,7 @@ export const ns = {
     ['throw']: (malValue) => {
         throw new MalTypesFactory().makeError(malValue);
     },
-    ['apply']: (...applyArgs) => {
+    ['apply']: async (...applyArgs) => {
         const malFunction = applyArgs[0];
         let args = [];
         for (let i = 1; i < applyArgs.length; i++) {
@@ -193,19 +197,19 @@ export const ns = {
         }
         let result;
         if (malFunction instanceof MalFunction) {
-            result = malFunction.fn(...args);
+            result = await malFunction.fn(...args);
         } else {
-            result = malFunction(...args);
+            result = await malFunction(...args);
         }
         return result;
     },
-    ['map']: (func, aList) => {
+    ['map']: async (func, aList) => {
         const result = new MalTypesFactory().makeList();
         for (let i = 0; i < aList.value.length; i++) {
             if (func instanceof MalFunction) {
-                result.value[i] = func.fn(aList.value[i]);
+                result.value[i] = await func.fn(aList.value[i]);
             } else {
-                result.value[i] = func(aList.value[i]);
+                result.value[i] = await func(aList.value[i]);
             }
         }
         return result;
@@ -295,5 +299,76 @@ export const ns = {
             vals[malHash.value[i].value] = malHash.value[i + 1];
         }
         return new MalTypesFactory().makeList(Object.values(vals));
+    },
+    ['readline']: async (malString) => {
+        const answer = await readline(malString.value);
+        if (answer === null) {
+            return new MalTypesFactory().makeNil();
+        }
+        return new MalTypesFactory().makeStringByValue(answer);
+    },
+    ['time-ms']: () => {
+        return new MalTypesFactory().makeNumber(Date.now());
+    },
+    ['meta']: (malValue) => {
+        if (malValue?.meta == null) {
+            return new MalTypesFactory().makeNil();
+        }
+        return malValue.meta;
+    },
+    ['with-meta']: (malValue, meta) => {
+        const newMalValue = clone(malValue);
+        newMalValue.meta = meta;
+        return newMalValue;
+    },
+    ['fn?']: (malValue) => {
+        return new MalTypesFactory().makeBool(
+            isFunction(malValue) || (malValue instanceof MalFunction && !malValue.is_macro),
+        );
+    },
+    ['macro?']: (malValue) => {
+        return new MalTypesFactory().makeBool(malValue instanceof MalFunction && malValue.is_macro);
+    },
+    ['string?']: (malValue) => {
+        return new MalTypesFactory().makeBool(malValue instanceof MalString);
+    },
+    ['number?']: (malValue) => {
+        return new MalTypesFactory().makeBool(malValue instanceof MalNumber);
+    },
+    ['seq']: (malValue) => {
+        if (malValue instanceof MalVector) {
+            if (malValue.value.length) {
+                const malList = new MalTypesFactory().makeList(malValue.value);
+                return malList;
+            } else {
+                return new MalTypesFactory().makeNil();
+            }
+        }
+        if (malValue instanceof MalString) {
+            if (malValue.value.length) {
+                const malList = new MalTypesFactory().makeList(
+                    malValue.value
+                        .split('')
+                        .map((ch) => new MalTypesFactory().makeStringByValue(ch)),
+                );
+                return malList;
+            } else {
+                return new MalTypesFactory().makeNil();
+            }
+        }
+        if (malValue instanceof MalList && !malValue.value.length) {
+            return new MalTypesFactory().makeNil();
+        }
+        return malValue;
+    },
+    ['conj']: (malValue, ...args) => {
+        if (malValue instanceof MalList) {
+            const malList = new MalTypesFactory().makeList();
+            malList.value = args.reverse().concat(malValue.value);
+            return malList;
+        } else {
+            const malVector = new MalTypesFactory().makeVector(malValue.value.concat(args));
+            return malVector;
+        }
     },
 };
