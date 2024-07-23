@@ -2,9 +2,16 @@ import { pr_str } from './printer.js';
 import { read_str } from './reader.js';
 import {
     MalAtom,
+    MalError,
+    MalFalse,
     MalFunction,
+    MalHash,
+    MalKeyword,
     MalList,
+    MalNil,
     MalNumber,
+    MalSymbol,
+    MalTrue,
     MalTypesFactory,
     MalVector,
     cmpMalValues,
@@ -150,7 +157,7 @@ export const ns = {
     ['nth']: (malValue, malNumber) => {
         if (isMalList(malValue)) {
             if (malNumber.value < 0 || malNumber.value >= malValue.value.length) {
-                throw 'out of range';
+                throw new MalError(new MalTypesFactory().makeStringByValue('out of range'));
             }
             return malValue.value[malNumber.value];
         }
@@ -170,5 +177,123 @@ export const ns = {
             result.value = malValue.value.slice(1);
         }
         return result;
+    },
+    ['throw']: (malValue) => {
+        throw new MalTypesFactory().makeError(malValue);
+    },
+    ['apply']: (...applyArgs) => {
+        const malFunction = applyArgs[0];
+        let args = [];
+        for (let i = 1; i < applyArgs.length; i++) {
+            if (isMalList(applyArgs[i])) {
+                args = args.concat(applyArgs[i].value);
+            } else {
+                args.push(applyArgs[i]);
+            }
+        }
+        let result;
+        if (malFunction instanceof MalFunction) {
+            result = malFunction.fn(...args);
+        } else {
+            result = malFunction(...args);
+        }
+        return result;
+    },
+    ['map']: (func, aList) => {
+        const result = new MalTypesFactory().makeList();
+        for (let i = 0; i < aList.value.length; i++) {
+            if (func instanceof MalFunction) {
+                result.value[i] = func.fn(aList.value[i]);
+            } else {
+                result.value[i] = func(aList.value[i]);
+            }
+        }
+        return result;
+    },
+    ['nil?']: (malValue) => {
+        return new MalTypesFactory().makeBool(malValue instanceof MalNil);
+    },
+    ['true?']: (malValue) => {
+        return new MalTypesFactory().makeBool(malValue instanceof MalTrue);
+    },
+    ['false?']: (malValue) => {
+        return new MalTypesFactory().makeBool(malValue instanceof MalFalse);
+    },
+    ['symbol?']: (malValue) => {
+        return new MalTypesFactory().makeBool(malValue instanceof MalSymbol);
+    },
+    ['keyword?']: (malValue) => {
+        return new MalTypesFactory().makeBool(malValue instanceof MalKeyword);
+    },
+    ['vector?']: (malValue) => {
+        return new MalTypesFactory().makeBool(malValue instanceof MalVector);
+    },
+    ['map?']: (malValue) => {
+        return new MalTypesFactory().makeBool(malValue instanceof MalHash);
+    },
+    ['sequential?']: (malValue) => {
+        return new MalTypesFactory().makeBool(isMalList(malValue));
+    },
+    ['symbol']: (malString) => {
+        return new MalTypesFactory().makeSymbol(malString.value);
+    },
+    ['keyword']: (malValue) => {
+        if (malValue instanceof MalKeyword) {
+            return malValue;
+        }
+        return new MalTypesFactory().makeKeyword(':' + malValue.value);
+    },
+    ['vector']: (...args) => {
+        return new MalTypesFactory().makeVector(args);
+    },
+    ['hash-map']: (...args) => {
+        return new MalTypesFactory().makeHash(args);
+    },
+    ['assoc']: (malHash, ...args) => {
+        return new MalTypesFactory().makeHash(malHash.value.concat(args));
+    },
+    ['dissoc']: (malHash, ...args) => {
+        const newMalHash = new MalTypesFactory().makeHash();
+        const keysToRemove = args.map((arg) => arg.value);
+        for (let i = 0; i < malHash.value.length; i += 2) {
+            if (!keysToRemove.includes(malHash.value[i].value)) {
+                newMalHash.value.push(malHash.value[i]);
+                newMalHash.value.push(malHash.value[i + 1]);
+            }
+        }
+        return newMalHash;
+    },
+    ['get']: (malHash, key) => {
+        if (malHash instanceof MalNil) {
+            return new MalTypesFactory().makeNil();
+        }
+        for (let i = malHash.value.length - 2; i >= 0; i -= 2) {
+            if (malHash.value[i].value === key.value) {
+                return malHash.value[i + 1];
+            }
+        }
+        return new MalTypesFactory().makeNil();
+    },
+    ['contains?']: (malHash, key) => {
+        for (let i = 0; i < malHash.value.length; i += 2) {
+            if (malHash.value[i].value === key.value) {
+                return new MalTypesFactory().makeTrue();
+            }
+        }
+        return new MalTypesFactory().makeFalse();
+    },
+    ['keys']: (malHash) => {
+        const keys = {};
+        for (let i = 0; i < malHash.value.length; i += 2) {
+            keys[malHash.value[i].value] = malHash.value[i];
+        }
+        return new MalTypesFactory().makeList(Object.values(keys));
+    },
+    ['vals']: (malHash) => {
+        const vals = {};
+        for (let i = 0; i < malHash.value.length; i += 2) {
+            vals[malHash.value[i].value] = malHash.value[i + 1];
+        }
+        return new MalTypesFactory().makeList(Object.values(vals));
     },
 };

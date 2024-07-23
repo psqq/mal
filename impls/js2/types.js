@@ -82,6 +82,16 @@ export class MalAtom extends MalType {
     }
 }
 
+export class MalError extends Error {
+    /**
+     * @param {MalType} reason
+     */
+    constructor(reason) {
+        super();
+        this.reason = reason;
+    }
+}
+
 export class MalTypesFactory {
     makeNumber(v) {
         const malNumber = new MalNumber();
@@ -91,6 +101,12 @@ export class MalTypesFactory {
 
     makeSymbol(s) {
         const malSymbol = new MalSymbol();
+        malSymbol.value = s;
+        return malSymbol;
+    }
+
+    makeKeyword(s) {
+        const malSymbol = new MalKeyword();
         malSymbol.value = s;
         return malSymbol;
     }
@@ -126,13 +142,13 @@ export class MalTypesFactory {
         return malListSlice;
     }
 
-    makeVector(v) {
+    makeVector(v = []) {
         const malVector = new MalVector();
         malVector.value = v;
         return malVector;
     }
 
-    makeHash(v) {
+    makeHash(v = []) {
         const malHash = new MalHash();
         malHash.value = v;
         return malHash;
@@ -146,20 +162,35 @@ export class MalTypesFactory {
         return new MalFalse();
     }
 
+    makeBool(flag) {
+        if (flag) {
+            return this.makeTrue();
+        } else {
+            return this.makeFalse();
+        }
+    }
+
     makeNil() {
         return new MalNil();
     }
 
     makeAtom(v) {
-        const malHash = new MalAtom();
-        malHash.value = v;
-        return malHash;
+        const malAtom = new MalAtom();
+        malAtom.value = v;
+        return malAtom;
+    }
+
+    makeError(reason) {
+        const malError = new MalError();
+        malError.reason = reason;
+        return malError;
     }
 }
 
 /**
  * @param {MalType} x
- * @returns {x is MalList | MalVector}
+ * @typedef {MalList | MalVector} MalAnyList
+ * @returns {x is MalAnyList}
  */
 export function isMalList(x) {
     return x instanceof MalList || x instanceof MalVector;
@@ -207,6 +238,25 @@ export function cmpMalValues(a, b) {
         a instanceof MalKeyword
     ) {
         return a.value === b.value;
+    }
+    if (a instanceof MalHash) {
+        const aKV = {};
+        const bKV = {};
+        for (let i = 0; i < a.value.length; i += 2) {
+            aKV[a.value[i].value] = a.value[i + 1];
+        }
+        for (let i = 0; i < b.value.length; i += 2) {
+            bKV[b.value[i].value] = b.value[i + 1];
+        }
+        if (Object.keys(aKV).length !== Object.keys(bKV).length) {
+            return false;
+        }
+        for (const k in aKV) {
+            if (!cmpMalValues(aKV[k], bKV[k])) {
+                return false;
+            }
+        }
+        return true;
     }
     return false;
 }

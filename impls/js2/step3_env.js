@@ -2,7 +2,15 @@ import { createInterface } from 'readline';
 import { read_str } from './reader.js';
 import { pr_str } from './printer.js';
 import { NextInput } from './errors.js';
-import { MalHash, MalList, MalSymbol, MalType, MalTypesFactory, MalVector } from './types.js';
+import {
+    MalError,
+    MalHash,
+    MalList,
+    MalSymbol,
+    MalType,
+    MalTypesFactory,
+    MalVector,
+} from './types.js';
 import { Env, EnvFactory } from './env.js';
 
 const repl_env = new EnvFactory().makeEnv();
@@ -100,8 +108,13 @@ async function rep() {
     } catch (e) {
         if (e instanceof NextInput) {
             return;
+        } else if (e instanceof MalError) {
+            const reason = e.reason;
+            console.log(`Error: ${pr_str(reason)}`);
+            console.log(e.stack);
         } else if (e instanceof Error) {
             console.log(e.message);
+            console.log(e);
         } else {
             console.log('Unknown error');
             console.log(e);

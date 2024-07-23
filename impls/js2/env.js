@@ -1,4 +1,4 @@
-import { MalList, MalTypesFactory, MalVector, isMalList } from './types.js';
+import { MalError, MalList, MalTypesFactory, isMalList } from './types.js';
 
 export class Env {
     constructor() {
@@ -28,7 +28,7 @@ export class Env {
     get(k) {
         const env = this.find(k);
         if (env == null) {
-            throw new Error(`'${k}' not found`);
+            throw new MalError(new MalTypesFactory().makeStringByValue(`'${k}' not found`));
         }
         return env.data[k];
     }

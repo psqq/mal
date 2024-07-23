@@ -5,6 +5,7 @@ import { NextInput } from './errors.js';
 import { pr_str } from './printer.js';
 import { read_str } from './reader.js';
 import {
+    MalError,
     MalFunction,
     MalHash,
     MalList,
@@ -154,6 +155,11 @@ function quasiquote(ast) {
     }
 }
 
+/**
+ * @param {MalType} astArg
+ * @param {Env} envArg
+ * @returns
+ */
 function EVAL(astArg, envArg) {
     let ast = astArg;
     let env = envArg;
@@ -203,7 +209,7 @@ function EVAL(astArg, envArg) {
             return quasiquote(ast.value[1]);
         } else if (ast.value[0].value === 'do') {
             const rest = new MalTypesFactory().makeListSlice(ast, 1, -1);
-            const result = eval_ast(rest, env);
+            eval_ast(rest, env);
             ast = ast.value[ast.value.length - 1];
         } else if (ast.value[0].value === 'if') {
             const condition = EVAL(ast.value[1], env);
@@ -215,6 +221,19 @@ function EVAL(astArg, envArg) {
                 }
             } else {
                 ast = ast.value[2];
+            }
+        } else if (ast.value[0].value === 'try*') {
+            try {
+                return EVAL(ast.value[1], env);
+            } catch (error) {
+                const hasCatchBlock = Boolean(ast?.value[2]);
+                if (error instanceof MalError && hasCatchBlock) {
+                    env = new EnvFactory().makeEnv(env);
+                    env.set(ast.value[2].value[1].value, error.reason);
+                    ast = ast.value[2].value[2];
+                } else {
+                    throw error;
+                }
             }
         } else if (ast.value[0].value === 'fn*') {
             const malFunc = new MalFunction();
@@ -260,7 +279,22 @@ async function rep(readFunc = () => READ(), { withPrint = true } = {}) {
         );
         EVAL(
             read_str(
-                '(defmacro! cond (fn* (& xs) (if (> (count xs) 0) (list \'if (first xs) (if (> (count xs) 1) (nth xs 1) (throw "odd number of forms to cond")) (cons \'cond (rest (rest xs)))))))',
+                `
+                    (defmacro! cond 
+                        (fn* (& xs)
+                            (if (> (count xs) 0)
+                                (list 
+                                    'if (first xs)
+                                        (if (> (count xs) 1)
+                                            (nth xs 1)
+                                            (throw "odd number of forms to cond")
+                                        )
+                                        (cons \'cond (rest (rest xs)))
+                                )
+                            )
+                        )
+                    )
+                `,
             ),
             repl_env,
         );
@@ -271,6 +305,10 @@ async function rep(readFunc = () => READ(), { withPrint = true } = {}) {
     } catch (e) {
         if (e instanceof NextInput) {
             return;
+        } else if (e instanceof MalError) {
+            const reason = e.reason;
+            console.log(`Error: ${pr_str(reason)}`);
+            console.log(e.stack);
         } else if (e instanceof Error) {
             console.log(e.message);
             console.log(e);

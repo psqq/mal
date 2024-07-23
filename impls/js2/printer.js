@@ -32,9 +32,16 @@ export function pr_str(v, print_readably = true) {
         }
         return '[' + a.join(' ') + ']';
     } else if (v instanceof MalHash) {
+        const keysInA = new Set();
         let a = [];
-        for (const x of v.value) {
-            a.push(pr_str(x));
+        for (let i = v.value.length - 2; i >= 0; i -= 2) {
+            if (!keysInA.has(v.value[i].value)) {
+                a = [
+                    pr_str(v.value[i], print_readably),
+                    pr_str(v.value[i + 1], print_readably),
+                ].concat(a);
+                keysInA.add(v.value[i].value);
+            }
         }
         return '{' + a.join(' ') + '}';
     } else if (v instanceof MalList) {
