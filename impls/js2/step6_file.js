@@ -1,4 +1,3 @@
-import { createInterface } from 'readline';
 import * as core from './core.js';
 import { Env, EnvFactory } from './env.js';
 import { NextInput } from './errors.js';
@@ -15,6 +14,7 @@ import {
     isFalsy,
     isMalList,
 } from './types.js';
+import { readline } from './readline.js';
 
 const repl_env = new EnvFactory().makeEnv();
 for (const [k, v] of Object.entries(core.ns)) {
@@ -22,16 +22,11 @@ for (const [k, v] of Object.entries(core.ns)) {
 }
 repl_env.set('eval', (ast) => EVAL(ast, repl_env));
 
-const rl = createInterface({
-    input: process.stdin,
-    output: process.stdout,
-}).on('close', () => process.exit(0));
-
 async function READ() {
-    // return read_str(String.raw`(read-string "\"\n\"")`);
-    const userInput = await new Promise((resolve) => {
-        rl.question('user> ', resolve);
-    });
+    const userInput = await readline('js2-user> ');
+    if (userInput === null) {
+        process.exit(0);
+    }
     return read_str(userInput);
 }
 
@@ -40,42 +35,48 @@ async function READ() {
  * @param {Env} env
  * @returns
  */
-function eval_ast(ast, env) {
+async function eval_ast(ast, env) {
     if (ast instanceof MalSymbol) {
         return env.get(ast.value);
     } else if (ast instanceof MalVector) {
-        return new MalTypesFactory().makeVector(ast.value.map((item) => EVAL(item, env)));
+        return new MalTypesFactory().makeVector(
+            await Promise.all(ast.value.map((item) => EVAL(item, env))),
+        );
     } else if (ast instanceof MalHash) {
         return new MalTypesFactory().makeHash(
-            ast.value.map((item, index) => {
-                if (index % 2 === 0) {
-                    return item;
-                } else {
-                    return EVAL(item, env);
-                }
-            }),
+            await Promise.all(
+                ast.value.map((item, index) => {
+                    if (index % 2 === 0) {
+                        return item;
+                    } else {
+                        return EVAL(item, env);
+                    }
+                }),
+            ),
         );
     } else if (ast instanceof MalList) {
         const malList = new MalList();
-        ast.value.forEach((v) => malList.value.push(EVAL(v, env)));
+        for (const v of ast.value) {
+            malList.value.push(await EVAL(v, env));
+        }
         return malList;
     } else {
         return ast;
     }
 }
 
-function EVAL(astArg, envArg) {
+async function EVAL(astArg, envArg) {
     let ast = astArg;
     let env = envArg;
     while (true) {
         if (!(ast instanceof MalList)) {
-            return eval_ast(ast, env);
+            return await eval_ast(ast, env);
         }
         if (!ast.value.length) {
             return ast;
         }
         if (ast.value[0].value === 'def!') {
-            const v = EVAL(ast.value[2], env);
+            const v = await EVAL(ast.value[2], env);
             env.set(ast.value[1].value, v);
             return v;
         } else if (ast.value[0].value === 'let*') {
@@ -86,16 +87,16 @@ function EVAL(astArg, envArg) {
             }
             for (let i = 0; i < letEnvList.value.length; i += 2) {
                 const key = letEnvList.value[i].value;
-                const value = EVAL(letEnvList.value[i + 1], env);
+                const value = await EVAL(letEnvList.value[i + 1], env);
                 env.set(key, value);
             }
             ast = ast.value[2];
         } else if (ast.value[0].value === 'do') {
             const rest = new MalTypesFactory().makeListSlice(ast, 1, -1);
-            const result = eval_ast(rest, env);
+            await eval_ast(rest, env);
             ast = ast.value[ast.value.length - 1];
         } else if (ast.value[0].value === 'if') {
-            const condition = EVAL(ast.value[1], env);
+            const condition = await EVAL(ast.value[1], env);
             if (isFalsy(condition)) {
                 if (ast.value.length >= 4) {
                     ast = ast.value[3];
@@ -110,21 +111,21 @@ function EVAL(astArg, envArg) {
             malFunc.ast = ast.value[2];
             malFunc.params = ast.value[1];
             malFunc.env = env;
-            malFunc.fn = (...args) => {
+            malFunc.fn = async (...args) => {
                 const fn_env = new EnvFactory().makeEnv(env, ast.value[1], args);
-                return EVAL(ast.value[2], fn_env);
+                return await EVAL(ast.value[2], fn_env);
             };
             return malFunc;
         } else {
             /** @type {MalList} */
-            const malList = eval_ast(ast, env);
+            const malList = await eval_ast(ast, env);
             const func = malList.value[0];
             const args = malList.value.slice(1);
             if (func instanceof MalFunction) {
                 ast = func.ast;
                 env = new EnvFactory().makeEnv(func.env, func.params, args);
             } else {
-                return func(...args);
+                return await func(...args);
             }
         }
     }
@@ -137,20 +138,24 @@ function PRINT(s) {
 async function rep(readFunc = () => READ(), { withPrint = true } = {}) {
     try {
         const ast = await readFunc();
-        EVAL(read_str('(def! not (fn* (a) (if a false true)))'), repl_env);
-        EVAL(
+        await EVAL(read_str('(def! not (fn* (a) (if a false true)))'), repl_env);
+        await EVAL(
             read_str(
                 '(def! load-file (fn* (f) (eval (read-string (str "(do " (slurp f) "\nnil)")))))',
             ),
             repl_env,
         );
-        const result = EVAL(ast, repl_env);
+        const result = await EVAL(ast, repl_env);
         if (withPrint) {
             PRINT(result);
         }
     } catch (e) {
         if (e instanceof NextInput) {
             return;
+        } else if (e instanceof MalError) {
+            const reason = e.reason;
+            console.log(`Error: ${pr_str(reason)}`);
+            console.log(e.stack);
         } else if (e instanceof Error) {
             console.log(e.message);
             console.log(e);

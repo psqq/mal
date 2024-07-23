@@ -1,8 +1,9 @@
-import { createInterface } from 'readline';
 import { read_str } from './reader.js';
 import { pr_str } from './printer.js';
 import { NextInput } from './errors.js';
 import { MalHash, MalList, MalSymbol, MalTypesFactory, MalVector } from './types.js';
+import { MalError } from './types.js';
+import { readline } from './readline.js';
 
 const repl_env = {
     ['+']: (a, b) => new MalTypesFactory().makeNumber(a.value + b.value),
@@ -11,15 +12,11 @@ const repl_env = {
     ['/']: (a, b) => new MalTypesFactory().makeNumber(a.value / b.value),
 };
 
-const rl = createInterface({
-    input: process.stdin,
-    output: process.stdout,
-}).on('close', () => process.exit(0));
-
 async function READ() {
-    const userInput = await new Promise((resolve) => {
-        rl.question('user> ', resolve);
-    });
+    const userInput = await readline('js2-user> ');
+    if (userInput === null) {
+        process.exit(0);
+    }
     return read_str(userInput);
 }
 
@@ -79,8 +76,13 @@ async function rep() {
     } catch (e) {
         if (e instanceof NextInput) {
             return;
+        } else if (e instanceof MalError) {
+            const reason = e.reason;
+            console.log(`Error: ${pr_str(reason)}`);
+            console.log(e.stack);
         } else if (e instanceof Error) {
             console.log(e.message);
+            console.log(e);
         } else {
             console.log('Unknown error');
             console.log(e);

@@ -1,14 +1,11 @@
-import { createInterface } from 'readline';
-
-const rl = createInterface({
-    input: process.stdin,
-    output: process.stdout,
-}).on('close', () => process.exit(0));
+import { readline } from './readline.js';
 
 async function READ() {
-    return new Promise((resolve) => {
-        rl.question('user> ', resolve);
-    });
+    const userInput = await readline('js2-user> ');
+    if (userInput === null) {
+        process.exit(0);
+    }
+    return userInput;
 }
 
 function EVAL(s) {

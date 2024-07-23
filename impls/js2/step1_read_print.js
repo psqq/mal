@@ -1,18 +1,15 @@
-import { createInterface } from 'readline';
 import { read_str } from './reader.js';
 import { pr_str } from './printer.js';
 import { NextInput } from './errors.js';
-
-const rl = createInterface({
-    input: process.stdin,
-    output: process.stdout,
-}).on('close', () => process.exit(0));
+import { MalError } from './types.js';
+import { readline } from './readline.js';
 
 async function READ() {
-    const inp = await new Promise((resolve) => {
-        rl.question('user> ', resolve);
-    });
-    return read_str(inp);
+    const userInput = await readline('js2-user> ');
+    if (userInput === null) {
+        process.exit(0);
+    }
+    return read_str(userInput);
 }
 
 function EVAL(s) {
@@ -31,8 +28,13 @@ async function rep() {
     } catch (e) {
         if (e instanceof NextInput) {
             return;
+        } else if (e instanceof MalError) {
+            const reason = e.reason;
+            console.log(`Error: ${pr_str(reason)}`);
+            console.log(e.stack);
         } else if (e instanceof Error) {
             console.log(e.message);
+            console.log(e);
         } else {
             console.log('Unknown error');
             console.log(e);

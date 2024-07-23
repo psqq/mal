@@ -1,4 +1,3 @@
-import { createInterface } from 'readline';
 import * as core from './core.js';
 import { Env, EnvFactory } from './env.js';
 import { NextInput } from './errors.js';
@@ -15,21 +14,18 @@ import {
     isFalsy,
     isMalList,
 } from './types.js';
+import { readline } from './readline.js';
 
 const repl_env = new EnvFactory().makeEnv();
 for (const [k, v] of Object.entries(core.ns)) {
     repl_env.set(k, v);
 }
 
-const rl = createInterface({
-    input: process.stdin,
-    output: process.stdout,
-}).on('close', () => process.exit(0));
-
 async function READ() {
-    const userInput = await new Promise((resolve) => {
-        rl.question('user> ', resolve);
-    });
+    const userInput = await readline('js2-user> ');
+    if (userInput === null) {
+        process.exit(0);
+    }
     return read_str(userInput);
 }
 
@@ -141,6 +137,10 @@ async function rep() {
     } catch (e) {
         if (e instanceof NextInput) {
             return;
+        } else if (e instanceof MalError) {
+            const reason = e.reason;
+            console.log(`Error: ${pr_str(reason)}`);
+            console.log(e.stack);
         } else if (e instanceof Error) {
             console.log(e.message);
             console.log(e);
